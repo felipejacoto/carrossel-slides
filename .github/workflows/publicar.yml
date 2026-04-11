@@ -32,7 +32,8 @@ jobs:
           LINKEDIN_URN:    ${{ secrets.LINKEDIN_URN }}
           TIKTOK_TOKEN:    ${{ secrets.TIKTOK_TOKEN }}
           YT_TOKEN:        ${{ secrets.YT_TOKEN }}
-          SUBSTACK_TOKEN:  ${{ secrets.SUBSTACK_TOKEN }}
-          SUBSTACK_DOMAIN: ${{ secrets.SUBSTACK_DOMAIN }}
+          SUBSTACK_TOKEN:   ${{ secrets.SUBSTACK_TOKEN }}
+          SUBSTACK_DOMAIN:  ${{ secrets.SUBSTACK_DOMAIN }}
+          SUBSTACK_USER_ID: ${{ secrets.SUBSTACK_USER_ID }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 scripts/publicar.py

@@ -18,8 +18,9 @@ LINKEDIN_TOKEN  = os.environ.get("LINKEDIN_TOKEN", "")
 LINKEDIN_URN    = os.environ.get("LINKEDIN_URN", "")    # urn:li:person:xxx
 TIKTOK_TOKEN    = os.environ.get("TIKTOK_TOKEN", "")
 YT_TOKEN        = os.environ.get("YT_TOKEN", "")        # YouTube OAuth token
-SUBSTACK_TOKEN  = os.environ.get("SUBSTACK_TOKEN", "")  # Substack API key
-SUBSTACK_DOMAIN = os.environ.get("SUBSTACK_DOMAIN", "") # ex: felipejacoto.substack.com
+SUBSTACK_TOKEN   = os.environ.get("SUBSTACK_TOKEN", "")   # substack.sid cookie
+SUBSTACK_DOMAIN  = os.environ.get("SUBSTACK_DOMAIN", "")  # ex: felipejacoto.substack.com
+SUBSTACK_USER_ID = int(os.environ.get("SUBSTACK_USER_ID", "0"))  # ID numérico do autor
 GH_TOKEN       = os.environ["GH_TOKEN"]
 REPO           = os.environ.get("GITHUB_REPOSITORY", "felipejacoto/carrossel-slides")
 
@@ -274,14 +275,16 @@ def pub_youtube_shorts(pasta, caption, total):
 
 def pub_substack(pasta, caption, total):
     """Publica post no Substack via API. Usa o caption como corpo do post."""
-    if not SUBSTACK_TOKEN or not SUBSTACK_DOMAIN:
-        raise Exception("SUBSTACK_TOKEN ou SUBSTACK_DOMAIN não configurados.")
+    if not SUBSTACK_TOKEN or not SUBSTACK_DOMAIN or not SUBSTACK_USER_ID:
+        raise Exception("SUBSTACK_TOKEN, SUBSTACK_DOMAIN ou SUBSTACK_USER_ID não configurados.")
 
-    # Substack API: criar draft e publicar
-    subdomain = SUBSTACK_DOMAIN.replace(".substack.com", "")
-    headers   = {"Cookie": f"substack.sid={SUBSTACK_TOKEN}"}
+    headers = {
+        "Cookie": f"substack.sid={SUBSTACK_TOKEN}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0",
+    }
 
-    # Monta corpo com as imagens dos slides embutidas como imagens
+    # Monta corpo com as imagens dos slides embutidas
     slide_imgs = "\n".join([
         f'<img src="{GH_RAW}/{pasta}/slide_{i:02d}.png" style="width:100%;max-width:600px;">'
         for i in range(1, total + 1)
@@ -293,11 +296,11 @@ def pub_substack(pasta, caption, total):
         f"https://{SUBSTACK_DOMAIN}/api/v1/drafts",
         headers=headers,
         json={
-            "draft_title":       caption.split("\n")[0][:100],
-            "draft_body":        body_html,
-            "draft_section_id":  None,
-            "audience":          "everyone",
-            "type":              "newsletter",
+            "draft_title":    caption.split("\n")[0][:100],
+            "draft_body":     body_html,
+            "draft_bylines":  [{"id": SUBSTACK_USER_ID, "is_guest": False}],
+            "audience":       "everyone",
+            "type":           "newsletter",
         }
     ).json()
     draft_id = draft.get("id")
