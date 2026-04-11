@@ -1,0 +1,28 @@
+name: Publicar Posts Agendados
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # verifica a cada 5 minutos
+  workflow_dispatch:          # permite rodar manualmente
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências
+        run: pip install requests
+
+      - name: Verificar e publicar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_ID:    ${{ secrets.IG_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/publicar.py
