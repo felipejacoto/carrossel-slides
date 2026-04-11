@@ -21,8 +21,18 @@ jobs:
 
       - name: Verificar e publicar
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IG_TOKEN: ${{ secrets.IG_TOKEN }}
-          IG_ID:    ${{ secrets.IG_ID }}
+          GH_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          IG_TOKEN:        ${{ secrets.IG_TOKEN }}
+          IG_ID:           ${{ secrets.IG_ID }}
+          THREADS_TOKEN:   ${{ secrets.THREADS_TOKEN }}
+          THREADS_ID:      ${{ secrets.THREADS_ID }}
+          FB_TOKEN:        ${{ secrets.FB_TOKEN }}
+          FB_PAGE_ID:      ${{ secrets.FB_PAGE_ID }}
+          LINKEDIN_TOKEN:  ${{ secrets.LINKEDIN_TOKEN }}
+          LINKEDIN_URN:    ${{ secrets.LINKEDIN_URN }}
+          TIKTOK_TOKEN:    ${{ secrets.TIKTOK_TOKEN }}
+          YT_TOKEN:        ${{ secrets.YT_TOKEN }}
+          SUBSTACK_TOKEN:  ${{ secrets.SUBSTACK_TOKEN }}
+          SUBSTACK_DOMAIN: ${{ secrets.SUBSTACK_DOMAIN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 scripts/publicar.py
