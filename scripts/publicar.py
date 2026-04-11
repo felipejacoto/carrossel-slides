@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
 Verifica Issues com label 'agendado' e publica nas redes indicadas pelas labels.
-Labels de rede suportadas: instagram, threads, facebook, linkedin, tiktok
+Labels de rede suportadas: instagram, threads, facebook, linkedin, tiktok, youtube-shorts, substack
 Rodado pelo GitHub Actions a cada 5 minutos.
 """
 import os, requests, time
 from datetime import datetime, timezone, timedelta
 
 # ── Credenciais (GitHub Secrets) ──────────────────────────────────────────────
-IG_TOKEN       = os.environ.get("IG_TOKEN", "")
-IG_ID          = os.environ.get("IG_ID", "")
-THREADS_TOKEN  = os.environ.get("THREADS_TOKEN", "")
-THREADS_ID     = os.environ.get("THREADS_ID", "")
-FB_TOKEN       = os.environ.get("FB_TOKEN", "")
-FB_PAGE_ID     = os.environ.get("FB_PAGE_ID", "")
-LINKEDIN_TOKEN = os.environ.get("LINKEDIN_TOKEN", "")
-LINKEDIN_URN   = os.environ.get("LINKEDIN_URN", "")   # urn:li:person:xxx
-TIKTOK_TOKEN   = os.environ.get("TIKTOK_TOKEN", "")
+IG_TOKEN        = os.environ.get("IG_TOKEN", "")
+IG_ID           = os.environ.get("IG_ID", "")
+THREADS_TOKEN   = os.environ.get("THREADS_TOKEN", "")
+THREADS_ID      = os.environ.get("THREADS_ID", "")
+FB_TOKEN        = os.environ.get("FB_TOKEN", "")
+FB_PAGE_ID      = os.environ.get("FB_PAGE_ID", "")
+LINKEDIN_TOKEN  = os.environ.get("LINKEDIN_TOKEN", "")
+LINKEDIN_URN    = os.environ.get("LINKEDIN_URN", "")    # urn:li:person:xxx
+TIKTOK_TOKEN    = os.environ.get("TIKTOK_TOKEN", "")
+YT_TOKEN        = os.environ.get("YT_TOKEN", "")        # YouTube OAuth token
+SUBSTACK_TOKEN  = os.environ.get("SUBSTACK_TOKEN", "")  # Substack API key
+SUBSTACK_DOMAIN = os.environ.get("SUBSTACK_DOMAIN", "") # ex: felipejacoto.substack.com
 GH_TOKEN       = os.environ["GH_TOKEN"]
 REPO           = os.environ.get("GITHUB_REPOSITORY", "felipejacoto/carrossel-slides")
 
@@ -235,13 +238,90 @@ def pub_tiktok(pasta, caption, total):
     return r.get("data", {}).get("publish_id")
 
 
+def pub_youtube_shorts(pasta, caption, total):
+    """Upload de vídeo como YouTube Short. Requer arquivo video.mp4 na pasta."""
+    if not YT_TOKEN:
+        raise Exception("YT_TOKEN não configurado.")
+    # YouTube Shorts requer vídeo vertical (9:16), não suporta carrossel de imagens.
+    # O arquivo deve ser posts/{pasta}/video.mp4, gerado separadamente.
+    video_url = f"{GH_RAW}/{pasta}/video.mp4"
+    video_bytes = requests.get(video_url).content
+    if not video_bytes:
+        raise Exception("video.mp4 não encontrado na pasta.")
+
+    # 1. Iniciar upload resumable
+    init = requests.post(
+        "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+        headers={
+            "Authorization": f"Bearer {YT_TOKEN}",
+            "Content-Type": "application/json",
+            "X-Upload-Content-Type": "video/mp4",
+        },
+        json={
+            "snippet": {"title": caption[:100], "description": caption, "categoryId": "22"},
+            "status":  {"privacyStatus": "public", "selfDeclaredMadeForKids": False},
+        }
+    )
+    upload_url = init.headers.get("Location")
+    if not upload_url:
+        raise Exception("Não foi possível iniciar upload no YouTube.")
+
+    # 2. Enviar vídeo
+    r = requests.put(upload_url, headers={"Content-Type": "video/mp4"}, data=video_bytes)
+    data = r.json()
+    return data.get("id")
+
+
+def pub_substack(pasta, caption, total):
+    """Publica post no Substack via API. Usa o caption como corpo do post."""
+    if not SUBSTACK_TOKEN or not SUBSTACK_DOMAIN:
+        raise Exception("SUBSTACK_TOKEN ou SUBSTACK_DOMAIN não configurados.")
+
+    # Substack API: criar draft e publicar
+    subdomain = SUBSTACK_DOMAIN.replace(".substack.com", "")
+    headers   = {"Cookie": f"substack.sid={SUBSTACK_TOKEN}"}
+
+    # Monta corpo com as imagens dos slides embutidas como imagens
+    slide_imgs = "\n".join([
+        f'<img src="{GH_RAW}/{pasta}/slide_{i:02d}.png" style="width:100%;max-width:600px;">'
+        for i in range(1, total + 1)
+    ])
+    body_html = f"<p>{caption.replace(chr(10), '</p><p>')}</p>{slide_imgs}"
+
+    # Criar draft
+    draft = requests.post(
+        f"https://{SUBSTACK_DOMAIN}/api/v1/drafts",
+        headers=headers,
+        json={
+            "draft_title":       caption.split("\n")[0][:100],
+            "draft_body":        body_html,
+            "draft_section_id":  None,
+            "audience":          "everyone",
+            "type":              "newsletter",
+        }
+    ).json()
+    draft_id = draft.get("id")
+    if not draft_id:
+        raise Exception(f"Erro ao criar draft: {draft}")
+
+    # Publicar
+    pub = requests.post(
+        f"https://{SUBSTACK_DOMAIN}/api/v1/drafts/{draft_id}/publish",
+        headers=headers,
+        json={"send_email": True, "share_automatically": False}
+    ).json()
+    return pub.get("id", draft_id)
+
+
 # ── Mapa de redes ─────────────────────────────────────────────────────────────
 PUBLISHERS = {
-    "instagram": pub_instagram,
-    "threads":   pub_threads,
-    "facebook":  pub_facebook,
-    "linkedin":  pub_linkedin,
-    "tiktok":    pub_tiktok,
+    "instagram":     pub_instagram,
+    "threads":       pub_threads,
+    "facebook":      pub_facebook,
+    "linkedin":      pub_linkedin,
+    "tiktok":        pub_tiktok,
+    "youtube-shorts": pub_youtube_shorts,
+    "substack":      pub_substack,
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
