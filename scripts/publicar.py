@@ -292,7 +292,7 @@ def pub_substack(pasta, caption, total):
     body_html = f"<p>{caption.replace(chr(10), '</p><p>')}</p>{slide_imgs}"
 
     # Criar draft
-    draft = requests.post(
+    r_draft = requests.post(
         f"https://{SUBSTACK_DOMAIN}/api/v1/drafts",
         headers=headers,
         json={
@@ -302,7 +302,11 @@ def pub_substack(pasta, caption, total):
             "audience":       "everyone",
             "type":           "newsletter",
         }
-    ).json()
+    )
+    print(f"    [draft] HTTP {r_draft.status_code} | body[:80]: {r_draft.text[:80]}")
+    if not r_draft.text.strip():
+        raise Exception(f"Substack draft retornou resposta vazia (HTTP {r_draft.status_code})")
+    draft = r_draft.json()
     draft_id = draft.get("id")
     if not draft_id:
         raise Exception(f"Erro ao criar draft: {draft}")
