@@ -292,21 +292,38 @@ def main():
                     print(f"ERRO: {e}")
                     resultados.append(f"❌ {rede}: {e}")
 
+            # Determinar status geral
+            tem_erro   = any(r.startswith("❌") for r in resultados)
+            tem_sucesso = any(r.startswith("✅") for r in resultados)
+
+            if tem_sucesso and tem_erro:
+                novo_label = ["publicado", "falhou"]   # parcialmente publicado
+            elif tem_sucesso:
+                novo_label = ["publicado"]
+            else:
+                novo_label = ["falhou"]                # todas as redes falharam
+
             # Fechar Issue e registrar resultado
-            gh("post", f"issues/{num}/labels", json={"labels": ["publicado"]})
+            gh("post", f"issues/{num}/labels", json={"labels": novo_label})
             gh("patch", f"issues/{num}", json={
                 "state": "closed",
-                "body": issue["body"] + f"\n\n---\nPublicado em {now.strftime('%d/%m/%Y %H:%M')} BRT\n" + "\n".join(resultados),
+                "body": issue["body"] + f"\n\n---\nProcessado em {now.strftime('%d/%m/%Y %H:%M')} BRT\n" + "\n".join(resultados),
             })
             requests.delete(
                 f"{API_GH}/issues/{num}/labels/agendado",
                 headers={"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json"},
             )
-            print(f"  Issue #{num} fechada.")
+            print(f"  Issue #{num} fechada com: {novo_label}")
 
         except Exception as e:
             print(f"  ERRO GERAL: {e}")
-            gh("post", f"issues/{num}/comments", json={"body": f"Erro: {e}"})
+            gh("post", f"issues/{num}/labels", json={"labels": ["falhou"]})
+            gh("patch", f"issues/{num}", json={"state": "closed"})
+            requests.delete(
+                f"{API_GH}/issues/{num}/labels/agendado",
+                headers={"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json"},
+            )
+            gh("post", f"issues/{num}/comments", json={"body": f"❌ Erro geral: {e}"})
 
 if __name__ == "__main__":
     main()
